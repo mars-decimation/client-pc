@@ -52,11 +52,6 @@ func (this TableLayout) GetMinimumSize() Bounds {
 	return NewBounds(-1, -1, 0, 0)
 }
 
-func (this TableLayout) GetMaximumSize() Bounds {
-	// TODO Implement
-	return NewBounds(-1, -1, 0, 0)
-}
-
 func (this TableLayout) Render() {
 	if this.NeedsLayout {
 		this.Layout()
