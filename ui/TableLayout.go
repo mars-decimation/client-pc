@@ -47,104 +47,104 @@ func NewTableLayout() TableLayout {
 }
 
 // GetBounds determines the bounds of the component
-func (this TableLayout) GetBounds() Bounds {
-	return this.Bounds
+func (layout TableLayout) GetBounds() Bounds {
+	return layout.Bounds
 }
 
 // SetBounds sets the bounds of the component
-func (this TableLayout) SetBounds(bounds Bounds) {
-	this.Bounds = bounds
-	this.Layout()
+func (layout TableLayout) SetBounds(bounds Bounds) {
+	layout.Bounds = bounds
+	layout.Layout()
 }
 
 // GetMinimumSize determines the minimum size of the component
-func (this TableLayout) GetMinimumSize() Bounds {
+func (layout TableLayout) GetMinimumSize() Bounds {
 	// TODO Implement
 	return NewBounds(-1, -1, 0, 0)
 }
 
 // Render draws this component and all of its child components onto the active GL context
-func (this TableLayout) Render() {
-	if this.NeedsLayout {
-		this.Layout()
+func (layout TableLayout) Render() {
+	if layout.NeedsLayout {
+		layout.Layout()
 	}
-	for _, child := range this.Children {
+	for _, child := range layout.Children {
 		// TODO Modify the transformation matrix
 		child.Component.Render()
 	}
 }
 
 // Layout recalculates all of the positions and sizes of the child components
-func (this TableLayout) Layout() {
+func (layout TableLayout) Layout() {
 	// TODO Implement
 }
 
 // Add adds an additional component to the layout with the given constraints
-func (this TableLayout) Add(component Component, row int, col int, rowSpan int, colSpan int) {
-	if maxRow := row + rowSpan; maxRow < len(this.Rows) {
+func (layout TableLayout) Add(component Component, row int, col int, rowSpan int, colSpan int) {
+	if maxRow := row + rowSpan; maxRow < len(layout.Rows) {
 		newRows := make([]TableLayoutSize, maxRow)
-		copy(newRows, this.Rows)
-		for i := len(this.Rows); i < maxRow; i++ {
+		copy(newRows, layout.Rows)
+		for i := len(layout.Rows); i < maxRow; i++ {
 			newRows[i] = TableLayoutSize{
 				SpacingType: Minimum,
 			}
 		}
-		this.Rows = newRows
+		layout.Rows = newRows
 	}
-	if maxCol := col + colSpan; maxCol < len(this.Cols) {
+	if maxCol := col + colSpan; maxCol < len(layout.Cols) {
 		newCols := make([]TableLayoutSize, maxCol)
-		copy(newCols, this.Cols)
-		for i := len(this.Cols); i < maxCol; i++ {
+		copy(newCols, layout.Cols)
+		for i := len(layout.Cols); i < maxCol; i++ {
 			newCols[i] = TableLayoutSize{
 				SpacingType: Minimum,
 			}
 		}
-		this.Cols = newCols
+		layout.Cols = newCols
 	}
-	this.Children = append(this.Children, TableLayoutChild{
+	layout.Children = append(layout.Children, TableLayoutChild{
 		Component: component,
 		Row:       row,
 		Col:       col,
 		RowSpan:   rowSpan,
 		ColSpan:   colSpan,
 	})
-	this.NeedsLayout = true
+	layout.NeedsLayout = true
 }
 
 // SetRowSize constrains the size of a row
-func (this TableLayout) SetRowSize(row int, spacingType SpacingType, size float32) {
-	if row < len(this.Rows) {
+func (layout TableLayout) SetRowSize(row int, spacingType SpacingType, size float32) {
+	if row < len(layout.Rows) {
 		newRows := make([]TableLayoutSize, row)
-		copy(this.Rows, newRows)
-		for i := len(this.Rows); i < row-1; i++ {
+		copy(layout.Rows, newRows)
+		for i := len(layout.Rows); i < row-1; i++ {
 			newRows[i] = TableLayoutSize{
 				SpacingType: Minimum,
 			}
 		}
-		this.Rows = newRows
+		layout.Rows = newRows
 	}
-	this.Rows[row] = TableLayoutSize{
+	layout.Rows[row] = TableLayoutSize{
 		SpacingType: spacingType,
 		Size:        size,
 	}
-	this.NeedsLayout = true
+	layout.NeedsLayout = true
 }
 
 // SetColSize constrains the size of a column
-func (this TableLayout) SetColSize(col int, spacingType SpacingType, size float32) {
-	if col < len(this.Cols) {
+func (layout TableLayout) SetColSize(col int, spacingType SpacingType, size float32) {
+	if col < len(layout.Cols) {
 		newCols := make([]TableLayoutSize, col)
-		copy(this.Cols, newCols)
-		for i := len(this.Cols); i < col-1; i++ {
+		copy(layout.Cols, newCols)
+		for i := len(layout.Cols); i < col-1; i++ {
 			newCols[i] = TableLayoutSize{
 				SpacingType: Minimum,
 			}
 		}
-		this.Cols = newCols
+		layout.Cols = newCols
 	}
-	this.Cols[col] = TableLayoutSize{
+	layout.Cols[col] = TableLayoutSize{
 		SpacingType: spacingType,
 		Size:        size,
 	}
-	this.NeedsLayout = true
+	layout.NeedsLayout = true
 }
