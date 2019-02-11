@@ -1,18 +1,24 @@
 package ui
 
+// SpacingType represents what kind of spacing a row or column uses
 type SpacingType int
 
 const (
+	// Absolute means the spacing value is the exact number of pixels the row or column should be
 	Absolute SpacingType = 0
-	Minimum  SpacingType = 1
-	Percent  SpacingType = 2
+	// Minimum means the row or column should shrink to fit the contents
+	Minimum SpacingType = 1
+	// Percent means the spacing value is a proportion used to fill extra space with when the layout grows or shrinks
+	Percent SpacingType = 2
 )
 
+// TableLayoutSize describes a row or column's spacing
 type TableLayoutSize struct {
 	SpacingType SpacingType
 	Size        float32
 }
 
+// TableLayoutChild describes all of the layout data for a given child component on the layout
 type TableLayoutChild struct {
 	Component Component
 	Row       int
@@ -21,6 +27,7 @@ type TableLayoutChild struct {
 	ColSpan   int
 }
 
+// TableLayout is a component that lays out its children components using a table
 type TableLayout struct {
 	Bounds      Bounds
 	Rows        []TableLayoutSize
@@ -29,6 +36,7 @@ type TableLayout struct {
 	NeedsLayout bool
 }
 
+// NewTableLayout creates a new table layout component with default values
 func NewTableLayout() TableLayout {
 	return TableLayout{
 		Bounds:   NewBounds(0, 0, 0, 0),
@@ -38,20 +46,24 @@ func NewTableLayout() TableLayout {
 	}
 }
 
+// GetBounds determines the bounds of the component
 func (this TableLayout) GetBounds() Bounds {
 	return this.Bounds
 }
 
+// SetBounds sets the bounds of the component
 func (this TableLayout) SetBounds(bounds Bounds) {
 	this.Bounds = bounds
 	this.Layout()
 }
 
+// GetMinimumSize determines the minimum size of the component
 func (this TableLayout) GetMinimumSize() Bounds {
 	// TODO Implement
 	return NewBounds(-1, -1, 0, 0)
 }
 
+// Render draws this component and all of its child components onto the active GL context
 func (this TableLayout) Render() {
 	if this.NeedsLayout {
 		this.Layout()
@@ -62,10 +74,12 @@ func (this TableLayout) Render() {
 	}
 }
 
+// Layout recalculates all of the positions and sizes of the child components
 func (this TableLayout) Layout() {
 	// TODO Implement
 }
 
+// Add adds an additional component to the layout with the given constraints
 func (this TableLayout) Add(component Component, row int, col int, rowSpan int, colSpan int) {
 	if maxRow := row + rowSpan; maxRow < len(this.Rows) {
 		newRows := make([]TableLayoutSize, maxRow)
@@ -97,6 +111,7 @@ func (this TableLayout) Add(component Component, row int, col int, rowSpan int, 
 	this.NeedsLayout = true
 }
 
+// SetRowSize constrains the size of a row
 func (this TableLayout) SetRowSize(row int, spacingType SpacingType, size float32) {
 	if row < len(this.Rows) {
 		newRows := make([]TableLayoutSize, row)
@@ -115,6 +130,7 @@ func (this TableLayout) SetRowSize(row int, spacingType SpacingType, size float3
 	this.NeedsLayout = true
 }
 
+// SetColSize constrains the size of a column
 func (this TableLayout) SetColSize(col int, spacingType SpacingType, size float32) {
 	if col < len(this.Cols) {
 		newCols := make([]TableLayoutSize, col)
