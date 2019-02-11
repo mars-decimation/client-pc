@@ -1,17 +1,17 @@
 package ui
 
 type Bounds struct {
-	x      float32
-	y      float32
-	width  float32
-	height float32
+	X      float32
+	Y      float32
+	Width  float32
+	Height float32
 }
 
 func NewBounds(x float32, y float32, width float32, height float32) Bounds {
 	return Bounds{
-		x:      x,
-		y:      y,
-		width:  width,
-		height: height,
+		X:      x,
+		Y:      y,
+		Width:  width,
+		Height: height,
 	}
 }
