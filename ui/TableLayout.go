@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 
+	"github.com/go-gl/gl/all-core/gl"
+
 	"github.com/willauld/lpsimplex"
 )
 
@@ -101,8 +103,11 @@ func (layout *TableLayout) Render() {
 		layout.Layout()
 	}
 	for _, child := range layout.Children {
-		// TODO Modify the transformation matrix
+		gl.PushMatrix()
+		t := [16]float32{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, child.Component.GetBounds().X, child.Component.GetBounds().Y, 0, 1}
+		gl.MultMatrixf(&t[0])
 		child.Component.Render()
+		gl.PopMatrix()
 	}
 }
 
