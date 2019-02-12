@@ -1,5 +1,7 @@
 package ui
 
+import "fmt"
+
 // Bounds reperesents a rectangle on the screen
 type Bounds struct {
 	X      float32
@@ -16,4 +18,9 @@ func NewBounds(x float32, y float32, width float32, height float32) Bounds {
 		Width:  width,
 		Height: height,
 	}
+}
+
+// String converts the bounds to a string
+func (bounds Bounds) String() string {
+	return fmt.Sprintf("(%f, %f) - <%f, %f>", bounds.X, bounds.Y, bounds.Width, bounds.Height)
 }
