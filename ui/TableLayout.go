@@ -35,11 +35,13 @@ type TableLayoutChild struct {
 
 // TableLayout is a component that lays out its children components using a table
 type TableLayout struct {
-	Bounds      Bounds
-	Rows        []TableLayoutSize
-	Cols        []TableLayoutSize
-	Children    []TableLayoutChild
-	NeedsLayout bool
+	Bounds       Bounds
+	MinSize      Bounds
+	Rows         []TableLayoutSize
+	Cols         []TableLayoutSize
+	Children     []TableLayoutChild
+	NeedsLayout  bool
+	NeedsMinCalc bool
 }
 
 // NewTableLayout creates a new table layout component with default values
@@ -65,8 +67,32 @@ func (layout *TableLayout) SetBounds(bounds Bounds) {
 
 // GetMinimumSize determines the minimum size of the component
 func (layout TableLayout) GetMinimumSize() Bounds {
-	// TODO Implement
-	return NewBounds(-1, -1, 0, 0)
+	if layout.NeedsMinCalc {
+		rowPos := layout.CalculateSmooshedLayout(layout.Rows, func(child TableLayoutChild) int {
+			return child.Row
+		}, func(child TableLayoutChild) int {
+			return child.RowSpan
+		}, func(bounds Bounds) float32 {
+			return bounds.Height
+		})
+		layout.MinSize.X = 0
+		for _, size := range rowPos {
+			layout.MinSize.X += size
+		}
+		colPos := layout.CalculateSmooshedLayout(layout.Cols, func(child TableLayoutChild) int {
+			return child.Col
+		}, func(child TableLayoutChild) int {
+			return child.ColSpan
+		}, func(bounds Bounds) float32 {
+			return bounds.Width
+		})
+		layout.MinSize.Y = 0
+		for _, size := range colPos {
+			layout.MinSize.Y += size
+		}
+		layout.NeedsMinCalc = false
+	}
+	return layout.MinSize
 }
 
 // Render draws this component and all of its child components onto the active GL context
@@ -80,9 +106,9 @@ func (layout *TableLayout) Render() {
 	}
 }
 
-// Layout recalculates all of the positions and sizes of the child components
-func (layout *TableLayout) Layout() {
-	numSizes := len(layout.Rows)
+// CalculateSmooshedLayout determines the minimum size for either the rows or columns, depending on the arguments passed in
+func (layout *TableLayout) CalculateSmooshedLayout(elements []TableLayoutSize, elementSelector func(TableLayoutChild) int, spanSelector func(TableLayoutChild) int, sizeSelector func(Bounds) float32) []float32 {
+	numSizes := len(elements)
 	numChildren := len(layout.Children)
 	c := make([]float64, numSizes)
 	for i := 0; i < numSizes; i++ {
@@ -96,58 +122,53 @@ func (layout *TableLayout) Layout() {
 		A[i] = make([]float64, numSizes)
 		An[i] = make([]float64, numSizes)
 		for j := 0; j < numSizes; j++ {
-			if layout.Children[i].Row <= j && j < layout.Children[i].Row+layout.Children[i].RowSpan {
+			if el := elementSelector(layout.Children[i]); el <= j && j < el+spanSelector(layout.Children[i]) {
 				A[i][j] = -1
 			} else {
 				A[i][j] = 0
 			}
 			An[i][j] = 0
 		}
-		b[i] = -float64(layout.Children[i].Component.GetMinimumSize().Height)
+		b[i] = -float64(sizeSelector(layout.Children[i].Component.GetMinimumSize()))
 		bn[i] = 0
 	}
-	rows := lpsimplex.LPSimplex(c, A, b, An, bn, nil, nil, false, 1000, 0.01, false)
-	if !rows.Success {
-		fmt.Printf("Unable to solve rows: %s\n", rows.Message)
-		return
+	res := lpsimplex.LPSimplex(c, A, b, An, bn, nil, nil, false, 1000, 0.01, false)
+	if !res.Success {
+		fmt.Printf("Unable to solve layout: %s\n", res.Message)
+		return nil
 	}
-	rowPos := make([]float32, numSizes+1)
+	pos := make([]float32, numSizes+1)
 	accum := 0.0
 	for i := 0; i < numSizes; i++ {
-		rowPos[i] = float32(accum)
-		accum = accum + rows.X[i]
+		pos[i] = float32(accum)
+		accum = accum + res.X[i]
 	}
-	rowPos[numSizes] = float32(accum)
-	numSizes = len(layout.Cols)
-	c = make([]float64, numSizes)
-	for i := 0; i < numSizes; i++ {
-		c[i] = 1
-	}
-	for i := 0; i < numChildren; i++ {
-		A[i] = make([]float64, numSizes)
-		An[i] = make([]float64, numSizes)
-		for j := 0; j < numSizes; j++ {
-			if layout.Children[i].Col <= j && j < layout.Children[i].Col+layout.Children[i].ColSpan {
-				A[i][j] = -1
-			} else {
-				A[i][j] = 0
-			}
-			An[i][j] = 0
-		}
-		b[i] = -float64(layout.Children[i].Component.GetMinimumSize().Width)
-	}
-	cols := lpsimplex.LPSimplex(c, A, b, An, bn, nil, nil, false, 1000, 0.01, false)
-	if !cols.Success {
-		fmt.Printf("Unable to solve columns: %s\n", cols.Message)
-		return
-	}
-	colPos := make([]float32, numSizes+1)
-	accum = 0
-	for i := 0; i < numSizes; i++ {
-		colPos[i] = float32(accum)
-		accum = accum + cols.X[i]
-	}
-	colPos[numSizes] = float32(accum)
+	pos[numSizes] = float32(accum)
+	return pos
+}
+
+// CalculateLayout determines either the size of the rows or columns, depending on the arguments passed in
+func (layout *TableLayout) CalculateLayout(elements []TableLayoutSize, elementSelector func(TableLayoutChild) int, spanSelector func(TableLayoutChild) int, sizeSelector func(Bounds) float32) []float32 {
+	pos := layout.CalculateSmooshedLayout(elements, elementSelector, spanSelector, sizeSelector)
+	return pos
+}
+
+// Layout recalculates all of the positions and sizes of the child components
+func (layout *TableLayout) Layout() {
+	rowPos := layout.CalculateLayout(layout.Rows, func(child TableLayoutChild) int {
+		return child.Row
+	}, func(child TableLayoutChild) int {
+		return child.RowSpan
+	}, func(bounds Bounds) float32 {
+		return bounds.Height
+	})
+	colPos := layout.CalculateLayout(layout.Cols, func(child TableLayoutChild) int {
+		return child.Col
+	}, func(child TableLayoutChild) int {
+		return child.ColSpan
+	}, func(bounds Bounds) float32 {
+		return bounds.Width
+	})
 	for _, child := range layout.Children {
 		x := colPos[child.Col]
 		y := rowPos[child.Row]
@@ -186,6 +207,7 @@ func (layout *TableLayout) Add(component Component, row int, col int, rowSpan in
 		ColSpan:   colSpan,
 	})
 	layout.NeedsLayout = true
+	layout.NeedsMinCalc = true
 }
 
 // SetRowSize constrains the size of a row
@@ -205,6 +227,7 @@ func (layout *TableLayout) SetRowSize(row int, spacingType SpacingType, size flo
 		Size:        size,
 	}
 	layout.NeedsLayout = true
+	layout.NeedsMinCalc = true
 }
 
 // SetColSize constrains the size of a column
@@ -224,4 +247,5 @@ func (layout *TableLayout) SetColSize(col int, spacingType SpacingType, size flo
 		Size:        size,
 	}
 	layout.NeedsLayout = true
+	layout.NeedsMinCalc = true
 }
