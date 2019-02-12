@@ -159,6 +159,21 @@ func (layout *TableLayout) CalculateSmooshedLayout(elements []TableLayoutSize, e
 // CalculateLayout determines either the size of the rows or columns, depending on the arguments passed in
 func (layout *TableLayout) CalculateLayout(elements []TableLayoutSize, elementSelector func(TableLayoutChild) int, spanSelector func(TableLayoutChild) int, sizeSelector func(Bounds) float32) []float32 {
 	pos := layout.CalculateSmooshedLayout(elements, elementSelector, spanSelector, sizeSelector)
+	totalPercent := float32(0)
+	for _, el := range elements {
+		if el.SpacingType == Percent {
+			totalPercent += el.Size
+		}
+	}
+	extra := sizeSelector(layout.Bounds) - pos[len(pos)-1]
+	offset := float32(0)
+	for i, el := range elements {
+		pos[i] += offset
+		if el.SpacingType == Percent {
+			offset += extra * el.Size / totalPercent
+		}
+	}
+	pos[len(elements)] += offset
 	return pos
 }
 
