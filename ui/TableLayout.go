@@ -139,9 +139,13 @@ func (layout *TableLayout) CalculateSmooshedLayout(elements []TableLayoutSize, e
 	}
 	pos := make([]float32, numSizes+1)
 	accum := 0.0
-	for i := 0; i < numSizes; i++ {
+	for i, size := range elements {
 		pos[i] = float32(accum)
-		accum = accum + res.X[i]
+		if size.SpacingType == Absolute {
+			accum += float64(size.Size)
+		} else {
+			accum += res.X[i]
+		}
 	}
 	pos[numSizes] = float32(accum)
 	return pos
