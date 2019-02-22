@@ -3,7 +3,6 @@ package font
 import (
 	"errors"
 	"io"
-	"math"
 	"os"
 	"unsafe"
 
@@ -17,6 +16,7 @@ import (
 // LoadedFont struct for storing info about each loaded font
 type LoadedFont struct {
 	Font   *truetype.Font
+	Size   fixed.Int26_6
 	Glyphs []GlyphVBO
 }
 
@@ -28,6 +28,7 @@ type GlyphVBO struct {
 	AdvanceWidth float64
 }
 
+// GetIndicesForString gets the glyph indices for each character in the string
 func GetIndicesForString(font *LoadedFont, str string) []truetype.Index {
 	var indices []truetype.Index
 	for _, char := range str {
@@ -36,7 +37,8 @@ func GetIndicesForString(font *LoadedFont, str string) []truetype.Index {
 	return indices
 }
 
-func GetKernsForIndices(font *LoadedFont, scale fixed.Int26_6, indices []truetype.Index) []float64 {
+// GetKernsForIndices gets the kernings for the indices
+func GetKernsForIndices(font *LoadedFont, indices []truetype.Index) []float64 {
 	var kerns []float64
 	var last truetype.Index
 	for i, index := range indices {
@@ -44,7 +46,7 @@ func GetKernsForIndices(font *LoadedFont, scale fixed.Int26_6, indices []truetyp
 			last = index
 			continue
 		}
-		fixedkern := font.Font.Kern(scale, last, index)
+		fixedkern := font.Font.Kern(font.Size, last, index)
 		kerns = append(kerns, float64(fixedkern))
 		last = index
 	}
@@ -52,9 +54,81 @@ func GetKernsForIndices(font *LoadedFont, scale fixed.Int26_6, indices []truetyp
 	return kerns
 }
 
-func LoadFont(scale float64) (*LoadedFont, error) {
+// DrawSlowString draws a string slowly by calculating and unpacking vertices on the fly
+func DrawSlowString(font *LoadedFont, str string, x, y float64) {
+	// get glyph indices for the runes in the string
+	indices := GetIndicesForString(font, str)
 
-	file, err := os.Open("C:/Windows/Fonts/times.ttf")
+	// get kernings for the indices
+	kerns := GetKernsForIndices(font, indices)
+	dx := 0.0
+
+	// draw each glyph
+	for i, index := range indices {
+		firstOnPoint := true
+		var curPoints []truetype.Point
+		glyphBuf := font.Glyphs[index].Glyph
+		glyphPoints := make([]truetype.Point, len(glyphBuf.Points)+len(glyphBuf.Ends))
+		glyphEnds := make([]int, len(glyphBuf.Ends))
+
+		// expand points to make complete contours
+		for end := range glyphBuf.Ends {
+			if end == 0 {
+				copy(glyphPoints[:glyphBuf.Ends[end]+end], glyphBuf.Points[:glyphBuf.Ends[end]])
+				glyphPoints[glyphBuf.Ends[end]+end] = glyphBuf.Points[0]
+			} else {
+				copy(glyphPoints[glyphBuf.Ends[end-1]+end:glyphBuf.Ends[end]+end], glyphBuf.Points[glyphBuf.Ends[end-1]:glyphBuf.Ends[end]])
+				glyphPoints[glyphBuf.Ends[end]+end] = glyphBuf.Points[glyphBuf.Ends[end-1]]
+			}
+			glyphEnds[end] = glyphBuf.Ends[end] + end
+		}
+
+		// draw contours
+		var endIndex int
+		for b, point := range glyphPoints {
+			if b == glyphEnds[endIndex]+1 {
+				endIndex++
+				firstOnPoint = true
+				curPoints = []truetype.Point{}
+			}
+
+			if point.Flags&1 == 0 {
+				curPoints = append(curPoints, point)
+			} else if firstOnPoint == false {
+				curPoints = append(curPoints, point)
+
+				gl.Color3d(1, 1, 1)
+				gl.Begin(gl.LINE_STRIP)
+				for d := 0.0; d <= 1.0; d += 0.1 {
+
+					if len(curPoints) == 2 {
+						_x, _y := LinearBézier(d, float64(curPoints[0].X), float64(curPoints[0].Y), float64(curPoints[1].X), float64(curPoints[1].Y))
+						gl.Vertex2d(x+_x+dx, y-_y)
+					} else if len(curPoints) == 3 {
+						_x, _y := QuadraticBézier(d, float64(curPoints[0].X), float64(curPoints[0].Y), float64(curPoints[1].X), float64(curPoints[1].Y), float64(curPoints[2].X), float64(curPoints[2].Y))
+						gl.Vertex2d(x+_x+dx, y-_y)
+					} else {
+						_x, _y := UnpackBézier(d, curPoints)
+						gl.Vertex2d(x+_x+dx, y-_y)
+					}
+				}
+				gl.End()
+				curPoints = []truetype.Point{point}
+				firstOnPoint = false
+			} else {
+				firstOnPoint = false
+				curPoints = append(curPoints, point)
+			}
+		}
+		dx += font.Glyphs[index].AdvanceWidth + kerns[i]
+
+	}
+}
+
+// LoadFont loads a font at the specified scale
+func LoadFont(path string, scale float64) (*LoadedFont, error) {
+
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +158,7 @@ func LoadFont(scale float64) (*LoadedFont, error) {
 
 	lfont := LoadedFont{
 		Font:   fnt,
+		Size:   fixed.Int26_6(scale),
 		Glyphs: []GlyphVBO{},
 	}
 	for i := 0; i < 4096; i++ {
@@ -109,6 +184,7 @@ func LoadFont(scale float64) (*LoadedFont, error) {
 
 }
 
+// buildGlyph builds a glyph VBO for the specified font
 func buildGlyph(font *truetype.Font, index int, scale fixed.Int26_6, hint font.Hinting) (*uint32, int32, error) {
 
 	vao := [1]uint32{}
@@ -189,6 +265,7 @@ func CubicBézier(t, p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y float64) (float64, f
 	return x, y
 }
 
+// UnpackBézier turns the incomplete bézier curves into their respective complete curves
 func UnpackBézier(t float64, points []truetype.Point) (float64, float64) {
 	subcurves := len(points) - 2
 	newpoints := []truetype.Point{points[0]}
@@ -209,7 +286,7 @@ func UnpackBézier(t float64, points []truetype.Point) (float64, float64) {
 	return x, y
 }
 
-func UnpackBézier2(points []truetype.Point) []truetype.Point {
+/*func UnpackBézier2(points []truetype.Point) []truetype.Point {
 	//subcurves := len(points) - 2
 	newpoints := []truetype.Point{points[0]}
 	for i := 1; i < len(points)-2; i++ {
@@ -246,4 +323,4 @@ func Factorial(x int32) int32 {
 		return 1
 	}
 	return x * Factorial(x-1)
-}
+}*/
